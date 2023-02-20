@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import re
 import sys
@@ -81,12 +79,14 @@ def search_youtube(q):
     try:
         info = ydl.extract_info('ytsearch:' + ' '.join(q), download=False)
     except youtube_dl.utils.DownloadError:
-        return None
+        return None, None
+    if not info['entries']:
+        return None, None
     info = info['entries'][0]
     try:
         _format = next(ydl_selector({'formats': info['formats']}))
     except StopIteration:
-        return None
+        return None, None
     filename = '{}-{}.{}'.format(
         info['title'].replace('/', '_'),
         info['id'],
@@ -126,115 +126,55 @@ def parse_args():
     return parser.parse_args()
 
 
-class OutputBuffer():
-    output = []
+def main():
+    args = parse_args()
 
-    def print(self, line):
-       self.output.append(line)
-
-    def __str__(self):
-        return "\n".join(self.output)
-            
-    def flush(self, file=''):
-        content = str(self)
-        if file == "":
-            print(content)
-        else:
-            f = open(file, 'w')
-            f.write(content)
-            f.close()
-   
-o = OutputBuffer()   
-
-def main(args):
-            
     target = "M3U"
     if 'target' in  args and args.target == "M3UEXT":
         target = 'M3UEXT'
-        o.print("#EXTM3U")
-            
+        print("#EXTM3U")
+
     files = list(iter_files(args.folder))
 
-    if args.outdir and not os.path.exists(args.outdir) :
+    if args.outdir:
         os.makedirs(args.outdir)
 
-    if os.path.exists(args.folder):
-        src=os.path.join(args.folder, args.src) 
-    
     with DownloadPool() as pool:
-        if os.path.exists(src) :
-            for track in iter_tracks(src):
-                location = track['location']
+        for track in iter_tracks(args.src):
+            location = track['location']
 
-                if location is None:
-                    context_key = ['creator', 'annotation']
-                    context = [track[k] for k in context_key if track[k]]
-                    location = find_by_title(track['title'], context, files)
-                    if location and args.outdir:
-                        location = hard_link(location, args.outdir)
+            if location is None:
+                context_key = ['creator', 'annotation']
+                context = [track[k] for k in context_key if track[k]]
+                location = find_by_title(track['title'], context, files)
+                if location and args.outdir:
+                    location = hard_link(location, args.outdir)
 
-                if location is None and args.youtube and youtube_dl:
-                    url, filename = search_youtube([q for q in track.values() if q])
-                    if args.outdir:
-                        location = os.path.join(args.outdir, filename)
-                        pool.download(url, location)
-                    else:
-                        location = url
-
-                if location is None:
-                    s = ' - '.join('{}: {}'.format(k, v) for k, v in track.items())
-                    print('# Warning: ' + s)
+            if location is None and args.youtube and youtube_dl:
+                url, filename = search_youtube(
+                    [q for q in track.values() if q]
+                )
+                if url is None:
+                    location = None
+                elif args.outdir:
+                    location = os.path.join(args.outdir, filename)
+                    pool.download(url, location)
                 else:
-                    if target == "M3U":
-                        o.print(location)
-                    if target == "M3UEXT":
-                        duration = int(int(track['duration']) / 1000) #I am not sure about this
-                        title = track['title']
-                        logo = track['image']
-                        o.print("#EXTINF:"+str(duration)+","+title+",logo="+logo)
-                        o.print(location)
-        else:
-            print("Can not open file '"+ src +"'")
+                    location = url
 
+            if location is None:
+                s = ' - '.join('{}: {}'.format(k, v) for k, v in track.items())
+                print('# Warning: ' + s)
+            else:
+                 if target == "M3U":
+                    print(location)
+                 if target == "M3UEXT":
+                    duration = int(int(track['duration']) / 1000) #I am not sure about this
+                    title = track['title']
+                    logo = track['image']
+                    print("#EXTINF:"+str(duration)+","+title+",logo="+logo)
+                    print(location)
 
 
 if __name__ == '__main__':
-    try:
-        #print(sys.argv)
-        args = parse_args()
-    except:
-        if len(sys.argv) == 1 : #Use our example
-            filename =  "example.xspf"  
-            # seems not used and confusing imho
-            indir  = "in"
-            print('Using example: "chmod u+x xspf2m3u.py;./xspf2m3u.py  "'+filename+'" "'+indir+'" --target=M3UEXT" gives:')
-            # Save into <outdir>/<filename>.m3u 
-            outdir = "out"  
-            # Choose your target
-            #target="M3UEXT"
-            target= "M3U"
-            args = argparse.Namespace(src= filename, folder=indir, outdir=outdir, target=target)   
-            sys.argv.append(filename)
-        elif len(sys.argv) == 2 : #We assume the script is in the current directory
-            filename = str(sys.argv[1])
-            indir  = "."
-            #We just dump the output content
-            outdir = None
-            # Choose your target
-            target="M3UEXT"
-           # target= "M3U"
-            args = argparse.Namespace(src= filename, folder=indir, outdir=outdir, target="M3U")   
-            sys.argv.append(filename)
-   
-    main(args)
-            
-    if  'outdir' in args and args.outdir is not None:
-        filename = str(sys.argv[1]).replace(".xspf",".m3u")
-        if args.target is None:
-                target = "M3U"
-        else:
-                target = "M3UEXT"
-        print("Saved "+target+" output into "+ os.path.join(args.outdir, filename))
-        o.flush(os.path.join(args.outdir, filename))
-    else:
-        o.flush()
+    main()

@@ -1,7 +1,7 @@
-xspf2m3u - simple XSPF to M3U conversion (and back)
+xspf2m3u - simple XSPF to M3U conversion
 
 Playlists tend to break whenever you reorder your music collection. The
-`XSPF <http://www.xspf.org/xspf-v1.html>`_ format allows to specify songs by
+`XSPF <https://xspf.org/spec>`_ format allows to specify songs by
 metadata rather than file location, so it theoretically solves that problem.
 Unfortnately, most audio players do not support that format.
 
@@ -17,23 +17,8 @@ dumb. It uses the following strategies:
 
 Usage::
 
-  xspf2m3u:
+    xspf2m3u input.xspf /my/music > output.m3u
 
-    # convert in/example.xspf to m3u and outputs result to the console
-    ./xspf2m3u.py example.xspf in
+    if you need M3UEXT support, then
 
-    # choose M3UEXT format as target 
-    ./xspf2m3u.py example.xspf in -T M3UEXT
-
-    # saves into 'out' directory as the 'example.m3u' file
-    ./xspf2m3u.py example.xspf in -O out
-
-  m3u2xspf:
-
-     # convert in/example.m3u to xspf and outputs result to the console
-     ./xspf2m3u.py in/example.m3u
-
-    # saves into the 'example.xspf' file in the 'out' directory
-    ./xspf2m3u.py example.xspf in -O out
-
-
+    xspf2m3u input.xspf /my/music --target M3UEXT > output.m3u
